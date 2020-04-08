@@ -3,6 +3,7 @@
 #
 import asyncio
 from asyncio import transports
+from collections import deque
 
 
 class ServerProtocol(asyncio.Protocol):
@@ -22,10 +23,20 @@ class ServerProtocol(asyncio.Protocol):
             self.send_message(decoded)
         else:
             if decoded.startswith("login:"):
-                self.login = decoded.replace("login:", "").replace("\r\n", "")
+                login = decoded.replace("login:", "").replace("\r\n", "")
+
+                for user in self.server.clients:
+                    if login == user.login:
+                        self.transport.write(
+                            f"Логин {login} занят, попробуйте другой\n".encode()
+                        )
+                        return
+                self.login = login
+
                 self.transport.write(
                     f"Привет, {self.login}!\n".encode()
                 )
+                self.send_history()
             else:
                 self.transport.write("Неправильный логин\n".encode())
 
@@ -41,15 +52,27 @@ class ServerProtocol(asyncio.Protocol):
     def send_message(self, content: str):
         message = f"{self.login}: {content}\n"
 
+        self.add_history(message)
         for user in self.server.clients:
             user.transport.write(message.encode())
+
+    def send_history(self):
+        for text in list(self.server.messages):
+            self.transport.write(
+                    text.encode()
+            )
+
+    def add_history(self, message):
+        self.server.messages.append(message)
 
 
 class Server:
     clients: list
+    messages: deque
 
     def __init__(self):
         self.clients = []
+        self.messages = deque('', 10)
 
     def build_protocol(self):
         return ServerProtocol(self)
