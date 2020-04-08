@@ -30,7 +30,7 @@ class ServerProtocol(asyncio.Protocol):
                         self.transport.write(
                             f"Логин {login} занят, попробуйте другой\n".encode()
                         )
-                        return
+                        self.connection_lost()
                 self.login = login
 
                 self.transport.write(
